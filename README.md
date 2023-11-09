@@ -1,0 +1,2 @@
+# genMat
+Sparse matrix generator
