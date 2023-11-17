@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 	int outfile_entered=0;
 	int print_header = 0;
 	int print_debug = 0;
-	int write_matrix = 0;
+	int write_matrix = 1;
 
 	char outfile[200];
 	
@@ -164,14 +164,8 @@ int main(int argc, char *argv[])
 	if (max > id_second-1){
 		max = id_second-1;
 	}
-	
-	
-	if(is_symmetric){
-		nnz_requested = (nnz + row_cnt)/2;
-	}
-	else{
-		nnz_requested = nnz;
-	}
+
+	nnz_requested = nnz;
 	avg_requested = avg;
 	density_requested = density;
 	std_requested = std;
@@ -179,6 +173,7 @@ int main(int argc, char *argv[])
 	max_requested = max;
 	cv_requested = cv;
 	imbalance_requested = imbalance;
+	
 
 	int **indices = (int **)safe_malloc(id_first * sizeof(int *));
 	int *degrees = (int *)safe_malloc(id_first * sizeof(int *));
@@ -194,7 +189,6 @@ int main(int argc, char *argv[])
 			int is_r_odd = row_cnt % 2;
 			int rl =  row_cnt - low_bandwidth;
 		
-
 			if (low_bandwidth < r2){
 				
 				#pragma omp parallel
@@ -227,6 +221,7 @@ int main(int argc, char *argv[])
 						}
 						
 						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+						indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
 						
 						curr_degree = 0;
 						for (int k = 0; k < j; k++) { // until diagonal
@@ -276,6 +271,7 @@ int main(int argc, char *argv[])
 						}
 						
 						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+						indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
 						
 						curr_degree = 0;
 						for (int k = j-low_bandwidth; k < j; k++) { // until diagonal
@@ -329,6 +325,7 @@ int main(int argc, char *argv[])
 					}
 					
 					indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+					indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
 					
 					curr_degree = 0;
 					for (int k = j-low_bandwidth; k < j; k++) { // until diagonal
@@ -374,6 +371,7 @@ int main(int argc, char *argv[])
 						}
 						
 						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+						indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
 						
 						curr_degree = 0;
 						for (int k = 0; k < j; k++) { // until diagonal
@@ -420,6 +418,7 @@ int main(int argc, char *argv[])
 						}
 						
 						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+						indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
 						
 						curr_degree = 0;
 						for (int k = 0; k < j; k++) { // until diagonal
@@ -470,6 +469,7 @@ int main(int argc, char *argv[])
 					}
 					
 					indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+					indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
 					
 					curr_degree = 0;
 					for (int k = 0; k < j; k++) { // until diagonal
@@ -790,29 +790,7 @@ int main(int argc, char *argv[])
 		if (curr_degree > max)
 			max = curr_degree;
 	}
-	
 		
-	printf("nnz \t %llu \t %llu \t ", nnz_requested, nnz );
-	
-	if(is_symmetric){
-		nnz = 2*nnz - row_cnt;
-	}
-	
-	avg = (nnz + 0.0) / id_first;
-	density =  avg / id_second ;
-	std = calculate_std(degrees, id_first, avg);
-	cv = std / avg;
-	imbalance = ( max - avg ) / avg;
-	
-	
-	printf("density \t %g \t %g \t %g \t ", density_requested, density, density / density_requested);
-	printf("avg \t %g \t %g \t %g \t ", avg_requested, avg, avg/avg_requested );
-	printf("std \t %g \t %g \t %g \t ", std_requested, std, std/std_requested );
-	printf("cv \t %g \t %g \t %g \t ", cv_requested, cv, cv/cv_requested );
-	printf("min \t %d \t %d \t %g \t ", min_requested, min, (min+0.0)/min_requested );
-	printf("max \t %d \t %d \t %g \t ", max_requested, max, (max+0.0)/max_requested );
-	printf("imbalance \t %g \t %g \t %g \t ", imbalance_requested, imbalance, imbalance/imbalance_requested );
-	
 	if (print_debug) printf(" \n ***INDICES_DONE \n ");
 
 	time_start1 = omp_get_wtime();
@@ -863,7 +841,25 @@ int main(int argc, char *argv[])
 
 	double time_end = omp_get_wtime();
 	
+	if(is_symmetric){
+		nnz = 2*nnz - row_cnt;
+	}
 	
+	avg = (nnz + 0.0) / id_first;
+	density =  avg / id_second ;
+	std = calculate_std(degrees, id_first, avg);
+	cv = std / avg;
+	imbalance = ( max - avg ) / avg;
+	
+	printf("nnz \t %llu \t %llu \t ", nnz_requested, nnz );
+	printf("density \t %g \t %g \t %g \t ", density_requested, density, density / density_requested);
+	printf("avg \t %g \t %g \t %g \t ", avg_requested, avg, avg/avg_requested );
+	printf("std \t %g \t %g \t %g \t ", std_requested, std, std/std_requested );
+	printf("cv \t %g \t %g \t %g \t ", cv_requested, cv, cv/cv_requested );
+	printf("min \t %d \t %d \t %g \t ", min_requested, min, (min+0.0)/min_requested );
+	printf("max \t %d \t %d \t %g \t ", max_requested, max, (max+0.0)/max_requested );
+	printf("imbalance \t %g \t %g \t %g \t ", imbalance_requested, imbalance, imbalance/imbalance_requested );
+
 	printf("%d \t TIME \t %.7f \t %.7f \t %.7f \n ", omp_get_max_threads(), time_nz, time_end - time_start1, time_end - time_start);
 	
 

@@ -14,7 +14,7 @@ Usage:
 	-v cv : coefficient of variation for degrees    
 	-u up_bandwidth : upper matrix bandwidth (valid if matrix is square)
 	-l low_bandwidth : lower matrix bandwidth (valid if matrix is square)
-	-r random_seed : seed for randomness                                                                                                                          
+	-r random_seed : seed for pseudo-randomness                                                                                                                          
 	-o outfile : to print out the generated matrix
 	-h print_header : to print the header names for the output values 
 	-b print_debug : to print at some main steps for debugging

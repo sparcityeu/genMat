@@ -17,7 +17,7 @@ Usage:
 	-r random_seed : seed for randomness                                                                                                                          
 	-o outfile : to print out the generated matrix
 	-h print_header : to print the header names for the output values 
-	-u print_debug : to print at some main steps for debugging
+	-b print_debug : to print at some main steps for debugging
 	-w write_matrix : to write the generated matrix into a file
 
 An example run command will be like the following:
