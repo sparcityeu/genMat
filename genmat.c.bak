@@ -128,8 +128,8 @@ int main(int argc, char *argv[])
 	
 	if (print_header){
 		printf("name \t seed \t rows \t cols \t ");
-		printf("up_bandwidth \t low_bandwidth \t ");
-		printf("request \t result \t ratio \t ");
+		printf("up_bandwidth \t low_bandwidth");
+		
 		printf("threads \t TIME \t time_nz \t time_write \t time_total \n");
 	}
 	
