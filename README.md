@@ -1,6 +1,6 @@
 # Matrix-Generator
 
-
+```
 Use the command "./compile.sh" to compile the program.
 
 Usage: 
@@ -23,3 +23,4 @@ Usage:
 An example run command will be like the following:
 
 ./genmat 100 100 -d 0.01 -c 0.5 -m 1 -i 1.5 -o data/generated_100.mtx
+```
