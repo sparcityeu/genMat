@@ -9,7 +9,7 @@ To compile the program, use the command
 USAGE: 
 
 ```
-./genten sizes[] [options]                                                                                                                               
+./genmat sizes[] [options]                                                                                                                               
 	-d density : nonzero ratio                              
 	-s is_symmetric : whether the matrix is symmetric (1:yes)
 	-c is_column : whether the degree properties are for column (1:yes)
