@@ -16,6 +16,23 @@
  */
 
 // double norm_box_muller(double mean, double stdev);
+int rand_count(double avg, double std, int min, int max, int curr_seed, double vals_pos );
+
+void distribute_sym_case1 ( double avg, double std, int min, int max, int id_first, 
+							int random_seed, int seed_mult, int low_bandwidth, int *degrees, int **indices) ;
+							
+void distribute_sym_case2 ( double avg, double std, int min, int max, int id_first, 
+							int random_seed, int seed_mult, int low_bandwidth, int *degrees, int **indices) ;
+
+void distribute_square_nonsym_case1 ( double avg, double std, int min, int max, int id_first, 
+							int random_seed, int seed_mult, int low_bandwidth, int up_bandwidth, int *degrees, int **indices) ;
+							
+void distribute_square_nonsym_case2 ( double avg, double std, int min, int max, int id_first, 
+							int random_seed, int seed_mult, int low_bandwidth, int up_bandwidth, int *degrees, int **indices) ;
+
+void distribute_rectangular ( double avg, double std, int min, int max, int id_first, int id_second, 
+							int random_seed, int seed_mult, int *degrees, int **indices) ;
+							
 double norm_box_muller(double mean, double stdev, int seed_bm);
 double calculate_std(int *arr, int arr_size, double mean);
 void *safe_malloc(size_t size);
@@ -45,7 +62,7 @@ int main(int argc, char *argv[])
 	int outfile_entered=0;
 	int print_header = 0;
 	int print_debug = 0;
-	int write_matrix = 0;
+	int write_matrix = 1;
 
 	char outfile[200];
 	
@@ -125,6 +142,15 @@ int main(int argc, char *argv[])
 	
 	srand(random_seed);
 	
+	if (is_symmetric){
+		up_bandwidth = low_bandwidth;
+		
+		if (!is_square){
+			printf("\n ERROR: Symmetric but not square !!! \n");
+			exit(1); 
+		}
+	}
+	
 	
 	if (print_header){
 		printf("name \t seed \t rows \t cols \t ");
@@ -137,11 +163,6 @@ int main(int argc, char *argv[])
 	printf("%d \t %d \t", row_cnt, col_cnt);
 	printf("%d \t %d \t", up_bandwidth, low_bandwidth);
 	
-	
-	if (is_symmetric && !is_square){
-		printf("\n ERROR: Symmetric but not square !!! \n");
-		exit(1); 
-	}
 	
 	int id_first = row_cnt;
 	int id_second = col_cnt;
@@ -186,602 +207,51 @@ int main(int argc, char *argv[])
 		if (is_symmetric){
 		
 			int r2 = row_cnt / 2;
-			int is_r_odd = row_cnt % 2;
-			int rl =  row_cnt - low_bandwidth;
 		
-			if (low_bandwidth < r2){
+			if (low_bandwidth < r2){	//first case for symmetric matrices
 				
-				#pragma omp parallel
-				{
-					USHI *is_nz_ind = (USHI*) safe_malloc(id_second * sizeof(USHI));
-					#pragma omp for
-					for (int j = 0; j < low_bandwidth; j++){
-						int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-						if ( curr_degree < min ){
-							curr_degree = min;
-						}
-						
-						if ( curr_degree > max){
-							curr_degree = max;
-						}
-
-						for (int k = 0; k < id_second; k++){
-							is_nz_ind [k] = 0;
-						}
-						
-						
-						unsigned int mystate = random_seed * (j+5) + curr_degree;
-						
-						int jl = j+low_bandwidth;
-						
-						//randomly fill nonzero values
-						for (int k = 0; k < curr_degree-1; k++){
-							is_nz_ind [rand_r(&mystate) % jl] = 1;
-						}
-						
-						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						
-						curr_degree = 0;
-						for (int k = 0; k < j; k++) { // until diagonal
-							if (is_nz_ind [k]){
-								indices[j][curr_degree++] = k ;
-							}
-						}
-						indices[j][curr_degree++] = j ; // make diagonal nz
-						degrees[j] = curr_degree;
-						
-						int rlj = rl - 2*j;
-						
-						curr_degree = 0;
-						for (int k = j+1; k < j+low_bandwidth; k++) { // after diagonal
-							if (is_nz_ind [k]){
-								indices[id_second - j][curr_degree++] = k + rlj;
-							}
-						}
-						indices[id_second - j][curr_degree++] = id_second - j ; // make diagonal nz
-						degrees[id_second - j] = curr_degree;
-					}
-					
-					#pragma omp for
-					for (int j = low_bandwidth; j < r2; j++){
-						int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-						if ( curr_degree < min ){
-							curr_degree = min;
-						}
-						
-						if ( curr_degree > max){
-							curr_degree = max;
-						}
-
-						for (int k = 0; k < id_second; k++){
-							is_nz_ind [k] = 0;
-						}
-						
-						unsigned int mystate = random_seed * (j+5) + curr_degree;
-						
-						int jl = j+low_bandwidth;
-						int l2 = 2 * low_bandwidth;
-						
-						//randomly fill nonzero values
-						for (int k = 0; k < curr_degree-1; k++){
-							is_nz_ind [rand_r(&mystate) % l2 + jl] = 1;
-						}
-						
-						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						
-						curr_degree = 0;
-						for (int k = j-low_bandwidth; k < j; k++) { // until diagonal
-							if (is_nz_ind [k]){
-								indices[j][curr_degree++] = k ;
-							}
-						}
-						indices[j][curr_degree++] = j ; // make diagonal nz
-						degrees[j] = curr_degree;
-				
-						int rlj = rl - 2*j;
-						
-						curr_degree = 0;
-						for (int k = j+1; k < j+low_bandwidth; k++) { // after diagonal
-							if (is_nz_ind [k]){
-								indices[id_second - j][curr_degree++] = k + rlj;
-							}
-						}
-						indices[id_second - j][curr_degree++] = id_second - j ; // make diagonal nz
-						degrees[id_second - j] = curr_degree;
-					}
-					free(is_nz_ind);
-				}
-				
-				
-				if (is_r_odd){ // extra one line if row_cnt is odd
-				
-					USHI *is_nz_ind = (USHI*) safe_malloc(id_second * sizeof(USHI));
-					int j= r2 +1;
-					int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-					if ( curr_degree < min ){
-						curr_degree = min;
-					}
-					
-					if ( curr_degree > max){
-						curr_degree = max;
-					}
-
-					#pragma omp parallel for
-					for (int k = 0; k < id_second; k++){
-						is_nz_ind [k] = 0;
-					}
-					
-					int jl = j+low_bandwidth;
-					int l2 = 2 * low_bandwidth;
-					
-					//randomly fill nonzero values
-					for (int k = 0; k < curr_degree-1; k++){
-						is_nz_ind [rand() % l2 + jl] = 1;
-					}
-					
-					indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-					indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
-					
-					curr_degree = 0;
-					for (int k = j-low_bandwidth; k < j; k++) { // until diagonal
-						if (is_nz_ind [k]){
-							indices[j][curr_degree++] = k ;
-						}
-					}
-					indices[j][curr_degree++] = j ; // make diagonal nz
-					degrees[j] = curr_degree;
-					
-				}
+				distribute_sym_case1 (  avg,  std,  min,  max,  id_first,  
+							 random_seed, 2, low_bandwidth, degrees, indices) ;
 				
 			}
 			
-			else{  // low_bandwidth > r2
+			else{  // low_bandwidth > r2, second case for symmetric matrices
 				
-				#pragma omp parallel
-				{
-					USHI *is_nz_ind = (USHI*) safe_malloc(id_second * sizeof(USHI));
-					#pragma omp for
-					for (int j = 0; j < row_cnt - low_bandwidth; j++){
-						int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-						if ( curr_degree < min ){
-							curr_degree = min;
-						}
-						
-						if ( curr_degree > max){
-							curr_degree = max;
-						}
-
-						for (int k = 0; k < id_second; k++){
-							is_nz_ind [k] = 0;
-						}
-						
-						unsigned int mystate = random_seed * (j+5) + curr_degree;
-						
-						int jl = j+low_bandwidth;
-						
-						//randomly fill nonzero values
-						for (int k = 0; k < curr_degree-1; k++){
-							is_nz_ind [rand_r(&mystate) % jl] = 1;
-						}
-						
-						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						
-						curr_degree = 0;
-						for (int k = 0; k < j; k++) { // until diagonal
-							if (is_nz_ind [k]){
-								indices[j][curr_degree++] = k ;
-							}
-						}
-						indices[j][curr_degree++] = j ; // make diagonal nz
-						degrees[j] = curr_degree;
-						
-						int rlj = rl - 2*j;
-						
-						curr_degree = 0;
-						for (int k = j+1; k < j+low_bandwidth; k++) { // after diagonal
-							if (is_nz_ind [k]){
-								indices[id_second - j][curr_degree++] = k + rlj;
-							}
-						}
-						indices[id_second - j][curr_degree++] = id_second - j ; // make diagonal nz
-						degrees[id_second - j] = curr_degree;
-					}
-					
-					#pragma omp for
-					for (int j = row_cnt - low_bandwidth; j < r2; j++){
-						int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-						if ( curr_degree < min ){
-							curr_degree = min;
-						}
-						
-						if ( curr_degree > max){
-							curr_degree = max;
-						}
-
-						for (int k = 0; k < id_second; k++){
-							is_nz_ind [k] = 0;
-						}
-						
-						unsigned int mystate = random_seed * (j+5) + curr_degree;
-						
-						//randomly fill nonzero values
-						for (int k = 0; k < curr_degree-1; k++){
-							is_nz_ind [rand_r(&mystate) % row_cnt] = 1;
-						}
-						
-						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						
-						curr_degree = 0;
-						for (int k = 0; k < j; k++) { // until diagonal
-							if (is_nz_ind [k]){
-								indices[j][curr_degree++] = k ;
-							}
-						}
-						indices[j][curr_degree++] = j ; // make diagonal nz
-						degrees[j] = curr_degree;
-				
-						int rlj = rl - 2*j;
-						
-						curr_degree = 0;
-						for (int k = j+1; k < row_cnt; k++) { // after diagonal
-							if (is_nz_ind [k]){
-								indices[id_second - j][curr_degree++] = k + rlj;
-							}
-						}
-						indices[id_second - j][curr_degree++] = id_second - j ; // make diagonal nz
-						degrees[id_second - j] = curr_degree;
-					}
-					free(is_nz_ind);
-				}
-				
-				
-				if (is_r_odd){ // extra one line if row_cnt is odd
-					
-					USHI *is_nz_ind = (USHI*) safe_malloc(id_second * sizeof(USHI));
-					int j= r2 +1;
-					int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-					if ( curr_degree < min ){
-						curr_degree = min;
-					}
-					
-					if ( curr_degree > max){
-						curr_degree = max;
-					}
-
-					#pragma omp parallel for
-					for (int k = 0; k < id_second; k++){
-						is_nz_ind [k] = 0;
-					}
-					
-					//randomly fill nonzero values
-					for (int k = 0; k < curr_degree-1; k++){
-						is_nz_ind [rand() % row_cnt] = 1;
-					}
-					
-					indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-					indices[id_second - j] = (int *)safe_calloc( curr_degree , sizeof(int));
-					
-					curr_degree = 0;
-					for (int k = 0; k < j; k++) { // until diagonal
-						if (is_nz_ind [k]){
-							indices[j][curr_degree++] = k ;
-						}
-					}
-					indices[j][curr_degree++] = j ; // make diagonal nz
-					degrees[j] = curr_degree;
-					free(is_nz_ind);
-				}
+				distribute_sym_case2 (  avg,  std,  min,  max,  id_first,  
+							 random_seed, 3, low_bandwidth, degrees, indices) ;
 			}
 		}
 		else{ // not symmetric but square
 			int ru = row_cnt - up_bandwidth;
-			if ( low_bandwidth > ru ){// first case for bandwidth
-				#pragma omp parallel
-				{
-					USHI *is_nz_ind = (USHI*) safe_malloc(id_second * sizeof(USHI));
-					#pragma omp for
-					for (int j = 0; j < ru; j++){
-						int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-						if ( curr_degree < min ){
-							curr_degree = min;
-						}
-						
-						if ( curr_degree > max){
-							curr_degree = max;
-						}
-
-						for (int k = 0; k < id_second; k++){
-							is_nz_ind [k] = 0;
-						}
-						
-						is_nz_ind [j] = 1; // make diagonal 1
-						
-						unsigned int mystate = random_seed * (j+5) + curr_degree;
-						
-						int ju = j+up_bandwidth;
-						
-						//randomly fill nonzero values
-						for (int k = 0; k < curr_degree-1; k++){
-							is_nz_ind [rand_r(&mystate) % ju] = 1;
-						}
-						
-						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						
-						curr_degree = 0;
-						for (int k = 0; k < id_second; k++) {
-							if (is_nz_ind [k]){
-								indices[j][curr_degree++] = k ;
-							}
-						}
-						degrees[j] = curr_degree;
-					}
-					
-					#pragma omp for
-					for (int j = ru; j < low_bandwidth; j++){
-						int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-						if ( curr_degree < min ){
-							curr_degree = min;
-						}
-						
-						if ( curr_degree > max){
-							curr_degree = max;
-						}
-
-						for (int k = 0; k < id_second; k++){
-							is_nz_ind [k] = 0;
-						}
-						
-						is_nz_ind [j] = 1; // make diagonal 1
-						
-						unsigned int mystate = random_seed * (j+5) + curr_degree;
-						
-						//randomly fill nonzero values
-						for (int k = 0; k < curr_degree-1; k++){
-							is_nz_ind [rand_r(&mystate) % id_second] = 1;
-						}
-						
-						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						
-						curr_degree = 0;
-						for (int k = 0; k < id_second; k++) {
-							if (is_nz_ind [k]){
-								indices[j][curr_degree++] = k ;
-							}
-						}
-						degrees[j] = curr_degree;
-					}
-					
-					#pragma omp for
-					for (int j = low_bandwidth; j < id_second; j++){
-						int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-						if ( curr_degree < min ){
-							curr_degree = min;
-						}
-						
-						if ( curr_degree > max){
-							curr_degree = max;
-						}
-
-						for (int k = 0; k < id_second; k++){
-							is_nz_ind [k] = 0;
-						}
-						
-						is_nz_ind [j] = 1; // make diagonal 1
-						
-						unsigned int mystate = random_seed * (j+5) + curr_degree;
-						
-						int jl = j-low_bandwidth;
-						int ijl = id_second-jl;
-						
-						//randomly fill nonzero values
-						for (int k = 0; k < curr_degree-1; k++){
-							is_nz_ind [rand_r(&mystate) % ijl + jl ] = 1;
-						}
-						
-						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						
-						curr_degree = 0;
-						for (int k = 0; k < id_second; k++) {
-							if (is_nz_ind [k]){
-								indices[j][curr_degree++] = k ;
-							}
-						}
-						degrees[j] = curr_degree;
-					}
-					free(is_nz_ind);
-				}
-			}
-			else{ // second case for bandwidth
 			
-				int  ul = up_bandwidth + low_bandwidth;
-				
-				#pragma omp parallel
-				{
-					USHI *is_nz_ind = (USHI*) safe_malloc(id_second * sizeof(USHI));
-					#pragma omp for
-					for (int j = 0; j < low_bandwidth; j++){
-						int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-						if ( curr_degree < min ){
-							curr_degree = min;
-						}
-						
-						if ( curr_degree > max){
-							curr_degree = max;
-						}
-
-						for (int k = 0; k < id_second; k++){
-							is_nz_ind [k] = 0;
-						}
-						
-						is_nz_ind [j] = 1; // make diagonal 1
-						
-						unsigned int mystate = random_seed * (j+5) + curr_degree;
-						
-						int ju = j+up_bandwidth;
-						
-						//randomly fill nonzero values
-						for (int k = 0; k < curr_degree-1; k++){
-							is_nz_ind [rand_r(&mystate) % ju] = 1;
-						}
-						
-						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						
-						curr_degree = 0;
-						for (int k = 0; k < id_second; k++) {
-							if (is_nz_ind [k]){
-								indices[j][curr_degree++] = k ;
-							}
-						}
-						degrees[j] = curr_degree;
-					}
-					
-					
-					#pragma omp for
-					for (int j = low_bandwidth; j < ru; j++){
-						int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-						if ( curr_degree < min ){
-							curr_degree = min;
-						}
-						
-						if ( curr_degree > max){
-							curr_degree = max;
-						}
-
-						for (int k = 0; k < id_second; k++){
-							is_nz_ind [k] = 0;
-						}
-						
-						is_nz_ind [j] = 1; // make diagonal 1
-						
-						unsigned int mystate = random_seed * (j+5) + curr_degree;
-						
-						int jl = j-low_bandwidth;
-						
-						//randomly fill nonzero values
-						for (int k = 0; k < curr_degree-1; k++){
-							is_nz_ind [rand_r(&mystate) % ul + jl] = 1;
-						}
-						
-						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						
-						curr_degree = 0;
-						for (int k = 0; k < id_second; k++) {
-							if (is_nz_ind [k]){
-								indices[j][curr_degree++] = k ;
-							}
-						}
-						degrees[j] = curr_degree;
-					}
-					
-					#pragma omp for
-					for (int j = ru; j < id_second; j++){
-						int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-						
-						if ( curr_degree < min ){
-							curr_degree = min;
-						}
-						
-						if ( curr_degree > max){
-							curr_degree = max;
-						}
-
-						for (int k = 0; k < id_second; k++){
-							is_nz_ind [k] = 0;
-						}
-						
-						is_nz_ind [j] = 1; // make diagonal 1
-						
-						unsigned int mystate = random_seed * (j+5) + curr_degree;
-						
-						int jl = j-low_bandwidth;
-						int ijl = id_second-jl;
-						
-						//randomly fill nonzero values
-						for (int k = 0; k < curr_degree-1; k++){
-							is_nz_ind [rand_r(&mystate) % ijl + jl ] = 1;
-						}
-						
-						indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-						
-						curr_degree = 0;
-						for (int k = 0; k < id_second; k++) {
-							if (is_nz_ind [k]){
-								indices[j][curr_degree++] = k ;
-							}
-						}
-						degrees[j] = curr_degree;
-					}
-					free(is_nz_ind);
-				}
+			if ( low_bandwidth > ru ){// first case for nonsymmetric square matrices
+			
+				distribute_square_nonsym_case1 (  avg,  std,  min,  max,  id_first,  
+							 random_seed, 4, low_bandwidth, up_bandwidth, degrees, indices) ;
+							
+			}
+			else{ // second case for nonsymmetric square matrices
+			
+				distribute_square_nonsym_case2 (  avg,  std,  min,  max,  id_first,  
+							 random_seed,5, low_bandwidth, up_bandwidth, degrees, indices) ;
+			
 			}
 		}
 	}
 	else{ // rectangular matrix
-		#pragma omp parallel
-		{
-			USHI *is_nz_ind = (USHI*) safe_malloc(id_second * sizeof(USHI));
-			#pragma omp for
-			for (int j = 0; j < id_first; j++){
-				int curr_degree = (int) round ( norm_box_muller(avg, std, random_seed*(j+10)));
-				
-				if ( curr_degree < min ){
-					curr_degree = min;
-				}
-				
-				if ( curr_degree > max){
-					curr_degree = max;
-				}
-
-				for (int k = 0; k < id_second; k++){
-					is_nz_ind [k] = 0;
-				}
-				
-				unsigned int mystate = random_seed * (j+5) + curr_degree;
-				
-				//randomly fill nonzero values
-				for (int k = 0; k < curr_degree; k++){
-					is_nz_ind [rand_r(&mystate) % id_second] = 1;
-					// is_nz_ind [rand() % dim_2] = 1;
-					// is_nz_ind [ (int) floor (rand_val(0) * dim_2) ] = 1;
-					// is_nz_ind [ rand_val_int(0, dim_2) ] = 1;
-				}
-				
-				indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
-				
-				curr_degree = 0;
-				for (int k = 0; k < id_second; k++) {
-					if (is_nz_ind [k]){
-						indices[j][curr_degree] = k ;
-						curr_degree++;
-					}
-				}
-				degrees[j] = curr_degree;
-			}
-			free(is_nz_ind);
-		}
+	
+		distribute_rectangular ( avg, std, min, max, id_first, id_second, 
+							random_seed, 6, degrees, indices) ;
 	}
+	
+	
 	
 	double time_nz = omp_get_wtime() - time_start1;
 
 	nnz = 0;
 	min = id_second;
 	max = 0;
-	#pragma omp parallel for reduction(+ : nnz)
+	
 	for (ULLI j = 0; j < id_first; j++){
 		int curr_degree = degrees[j];
 		nnz += degrees[j];
@@ -865,6 +335,578 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+int rand_count(double avg, double std, int min, int max, int curr_seed, double vals_pos ){
+	
+	int curr_degree ;
+	
+	if( vals_pos > 0 ){ // apply normal distribution if most values are expected to be positive
+		curr_degree = (int) round ( norm_box_muller(avg, std, curr_seed));
+	}
+	else{ //apply log-normal distribution
+
+		double avg_log_norm = log(avg * avg / sqrt(avg * avg + std* std));
+		double std_log_norm = sqrt(log(1 + std* std / avg * avg));
+		
+		curr_degree =  (int) round ( exp ( norm_box_muller ( avg_log_norm, std_log_norm, curr_seed )));
+	}
+	
+	if ( curr_degree < min ){
+		curr_degree = min;
+	}
+	
+	if ( curr_degree > max){
+		curr_degree = max;
+	}
+	
+	return curr_degree;
+}
+
+
+
+void distribute_sym_case1 ( double avg, double std, int min, int max, int id_first, 
+							int random_seed, int seed_mult, int low_bandwidth, int *degrees, int **indices) 
+{
+	int r1 = id_first - 1;
+	int r2 = id_first / 2;
+	int is_r_odd = id_first % 2;
+	
+	double vals_pos = avg - 3 * std; // to determine whether most values are expected to be positive with normal distribution
+	
+	#pragma omp parallel
+	{
+		USHI *is_nz_ind = (USHI*) safe_malloc(id_first * sizeof(USHI));
+		#pragma omp for
+		for (int j = 0; j < low_bandwidth; j++){
+			
+			int curr_seed = random_seed*(j+seed_mult);	
+			int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+			for (int k = 0; k < id_first; k++){
+				is_nz_ind [k] = 0;
+			}
+			
+			unsigned int mystate = curr_seed + curr_degree%10;
+			
+			int jl = j + low_bandwidth;
+			
+			//randomly fill nonzero values
+			for (int k = 0; k < curr_degree-1; k++){
+				is_nz_ind [rand_r(&mystate) % jl] = 1;
+			}
+			
+			indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			indices[r1 - j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			
+			curr_degree = 0;
+			for (int k = 0; k < j; k++) { // until diagonal
+				if (is_nz_ind [k]){
+					indices[j][curr_degree++] = k ;
+				}
+			}
+			indices[j][curr_degree++] = j ; // make diagonal nz
+			degrees[j] = curr_degree;
+			
+			curr_degree = 0;
+			for (int k = j+1; k < j+low_bandwidth; k++) { // after diagonal
+				if (is_nz_ind [k]){
+					indices[r1 - j][curr_degree++] = id_first-k;
+				}
+			}
+			indices[r1 - j][curr_degree++] = r1 - j ; // make diagonal nz
+			degrees[r1 - j] = curr_degree;
+		}
+		
+		#pragma omp for
+		for (int j = low_bandwidth; j < r2; j++){
+			
+			int curr_seed = random_seed*(j+seed_mult);	
+			int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+			for (int k = 0; k < id_first; k++){
+				is_nz_ind [k] = 0;
+			}
+			
+			unsigned int mystate = curr_seed + curr_degree%10;
+			
+			int jl = j-low_bandwidth;
+			int l2 = 2 * low_bandwidth;
+			
+			//randomly fill nonzero values
+			for (int k = 0; k < curr_degree-1; k++){
+				is_nz_ind [rand_r(&mystate) % l2 + jl] = 1;
+			}
+			
+			indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			indices[r1 - j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			
+			curr_degree = 0;
+			for (int k = j-low_bandwidth; k < j; k++) { // until diagonal
+				if (is_nz_ind [k]){
+					indices[j][curr_degree++] = k ;
+				}
+			}
+			indices[j][curr_degree++] = j ; // make diagonal nz
+			degrees[j] = curr_degree;
+			
+			curr_degree = 0;
+			for (int k = j+1; k < j+low_bandwidth; k++) { // after diagonal
+				if (is_nz_ind [k]){
+					indices[r1 - j][curr_degree++] = id_first-k;
+				}
+			}
+			indices[r1 - j][curr_degree++] = r1 - j ; // make diagonal nz
+			degrees[r1 - j] = curr_degree;
+		}
+		free(is_nz_ind);
+	}
+	
+	
+	if (is_r_odd){ // extra one line if row_cnt is odd
+	
+		USHI *is_nz_ind = (USHI*) safe_malloc(id_first * sizeof(USHI));
+		int j= r2 +1;
+		
+		int curr_seed = random_seed*(j+seed_mult);	
+		int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+		#pragma omp parallel for
+		for (int k = 0; k < id_first; k++){
+			is_nz_ind [k] = 0;
+		}
+		
+		int jl = j-low_bandwidth;
+		int l2 = 2 * low_bandwidth;
+		
+		//randomly fill nonzero values
+		for (int k = 0; k < curr_degree-1; k++){
+			is_nz_ind [rand() % l2 + jl] = 1;
+		}
+		
+		indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+		indices[r1 - j] = (int *)safe_calloc( curr_degree , sizeof(int));
+		
+		curr_degree = 0;
+		for (int k = j-low_bandwidth; k < j; k++) { // until diagonal
+			if (is_nz_ind [k]){
+				indices[j][curr_degree++] = k ;
+			}
+		}
+		indices[j][curr_degree++] = j ; // make diagonal nz
+		degrees[j] = curr_degree;
+		
+	}
+}
+
+
+void distribute_sym_case2 ( double avg, double std, int min, int max, int id_first, 
+							int random_seed, int seed_mult, int low_bandwidth, int *degrees, int **indices) 
+{
+	
+	int r1 = id_first - 1;
+	int r2 = id_first / 2;
+	int is_r_odd = id_first % 2;
+	int rl =  id_first - low_bandwidth;
+	
+	double vals_pos = avg - 3 * std; // to determine whether most values are expected to be positive with normal distribution
+	
+	#pragma omp parallel
+	{
+		USHI *is_nz_ind = (USHI*) safe_malloc(id_first * sizeof(USHI));
+		#pragma omp for
+		for (int j = 0; j < rl-1; j++){
+			int curr_seed = random_seed*(j+seed_mult);	
+			int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+			for (int k = 0; k < id_first; k++){
+				is_nz_ind [k] = 0;
+			}
+			
+			unsigned int mystate = curr_seed + curr_degree%10;
+			
+			int jl = j+low_bandwidth;
+			
+			//randomly fill nonzero values
+			for (int k = 0; k < curr_degree-1; k++){
+				is_nz_ind [rand_r(&mystate) % jl] = 1;
+			}
+			
+			indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			indices[r1 - j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			
+			curr_degree = 0;
+			for (int k = 0; k < j; k++) { // until diagonal
+				if (is_nz_ind [k]){
+					// if (print_debug) printf("ind[%d][%d] = %d (Until diag, before rl) \n", j, curr_degree, k);
+					indices[j][curr_degree++] = k ;
+				}
+			}
+			
+			// if (print_debug) printf("ind[%d][%d] = %d (Diag, before rl) \n", j, curr_degree, j);
+			indices[j][curr_degree++] = j ; // make diagonal nz
+			degrees[j] = curr_degree;
+			
+			// int rlj = rl - 2*j;
+			
+			curr_degree = 0;
+			for (int k = j+1; k < j+low_bandwidth; k++) { // after diagonal
+				if (is_nz_ind [k]){
+					// if (print_debug) printf("ind[%d][%d] = %d (After diag, before rl)  k=%d, rl=%d, j=%d \n", r1 - j, curr_degree, id_first-k, k, rl, j);
+					indices[r1 - j][curr_degree++] = id_first-k;
+				}
+			}
+			indices[r1 - j][curr_degree++] = r1 - j ; // make diagonal nz
+			degrees[r1 - j] = curr_degree;
+		}
+		
+		#pragma omp for
+		for (int j = rl-1; j < r2; j++){
+			int curr_seed = random_seed*(j+seed_mult);	
+			int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+			for (int k = 0; k < id_first; k++){
+				is_nz_ind [k] = 0;
+			}
+			
+			unsigned int mystate = curr_seed + curr_degree%10;
+			
+			//randomly fill nonzero values
+			for (int k = 0; k < curr_degree-1; k++){
+				is_nz_ind [rand_r(&mystate) % id_first] = 1;
+			}
+			
+			indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			indices[r1 - j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			
+			curr_degree = 0;
+			for (int k = 0; k < j; k++) { // until diagonal
+				if (is_nz_ind [k]){
+					// if (print_debug) printf("ind[%d][%d] = %d (Until diag, After rl) \n", j, curr_degree, k);
+					indices[j][curr_degree++] = k ;
+				}
+			}
+			// if (print_debug) printf("ind[%d][%d] = %d (Diag, After rl) \n", j, curr_degree, j);
+			indices[j][curr_degree++] = j ; // make diagonal nz
+			degrees[j] = curr_degree;
+	
+			// int rlj = rl - 2*j;
+			
+			curr_degree = 0;
+			for (int k = j+1; k < id_first; k++) { // after diagonal
+				if (is_nz_ind [k]){
+					// if (print_debug) printf("ind[%d][%d] = %d (After diag, After rl) k=%d, rl=%d, j=%d\n", r1 - j, curr_degree, id_first-k, k, rl, j);
+					// indices[id_first - j][curr_degree++] = k + rlj;
+					indices[r1 - j][curr_degree++] = id_first - k;
+				}
+			}
+			
+			// if (print_debug) printf("ind[%d][%d] = %d (Diag, After rl) j=%d \n", r1 - j, curr_degree, r1 - j, j);
+			indices[r1 - j][curr_degree++] = r1 - j ; // make diagonal nz
+			degrees[r1 - j] = curr_degree;
+		}
+		free(is_nz_ind);
+	}
+	
+	
+	if (is_r_odd){ // extra one line if id_first is odd
+		
+		USHI *is_nz_ind = (USHI*) safe_malloc(id_first * sizeof(USHI));
+		int j= r2 +1;
+		int curr_seed = random_seed*(j+seed_mult);	
+		int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+		#pragma omp parallel for
+		for (int k = 0; k < id_first; k++){
+			is_nz_ind [k] = 0;
+		}
+		
+		//randomly fill nonzero values
+		for (int k = 0; k < curr_degree-1; k++){
+			is_nz_ind [rand() % id_first] = 1;
+		}
+		
+		indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+		indices[r1 - j] = (int *)safe_calloc( curr_degree , sizeof(int));
+		
+		curr_degree = 0;
+		for (int k = 0; k < j; k++) { // until diagonal
+			if (is_nz_ind [k]){
+				// if (print_debug) printf("ind[%d][%d] = %d (Until diag, r is ODD) \n", j, curr_degree, k);
+				indices[j][curr_degree++] = k ;
+			}
+		}
+		// if (print_debug) printf("ind[%d][%d] = %d (Diag, r is ODD) \n", j, curr_degree, j);
+		indices[j][curr_degree++] = j ; // make diagonal nz
+		degrees[j] = curr_degree;
+		free(is_nz_ind);
+	}
+}
+
+void distribute_square_nonsym_case1 ( double avg, double std, int min, int max, int id_first, 
+							int random_seed, int seed_mult, int low_bandwidth, int up_bandwidth, int *degrees, int **indices) 
+{
+	int ru = id_first - up_bandwidth;
+	double vals_pos = avg - 3 * std; // to determine whether most values are expected to be positive with normal distribution
+	
+	#pragma omp parallel
+	{
+		USHI *is_nz_ind = (USHI*) safe_malloc(id_first * sizeof(USHI));
+		#pragma omp for
+		for (int j = 0; j < ru; j++){
+			
+			int curr_seed = random_seed*(j+seed_mult);	
+			int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+			
+			for (int k = 0; k < id_first; k++){
+				is_nz_ind [k] = 0;
+			}
+			
+			is_nz_ind [j] = 1; // make diagonal 1
+			
+			unsigned int mystate = curr_seed + curr_degree%10;
+			
+			int ju = j+up_bandwidth;
+			
+			//randomly fill nonzero values
+			for (int k = 0; k < curr_degree-1; k++){
+				is_nz_ind [rand_r(&mystate) % ju] = 1;
+			}
+			
+			indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			
+			curr_degree = 0;
+			for (int k = 0; k < id_first; k++) {
+				if (is_nz_ind [k]){
+					indices[j][curr_degree++] = k ;
+				}
+			}
+			degrees[j] = curr_degree;
+		}
+		
+		#pragma omp for
+		for (int j = ru; j < low_bandwidth; j++){
+			
+			int curr_seed = random_seed*(j+seed_mult);
+			
+			int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+			for (int k = 0; k < id_first; k++){
+				is_nz_ind [k] = 0;
+			}
+			
+			is_nz_ind [j] = 1; // make diagonal 1
+			
+			unsigned int mystate = curr_seed + curr_degree%10;
+			
+			//randomly fill nonzero values
+			for (int k = 0; k < curr_degree-1; k++){
+				is_nz_ind [rand_r(&mystate) % id_first] = 1;
+			}
+			
+			indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			
+			curr_degree = 0;
+			for (int k = 0; k < id_first; k++) {
+				if (is_nz_ind [k]){
+					indices[j][curr_degree++] = k ;
+				}
+			}
+			degrees[j] = curr_degree;
+		}
+		
+		#pragma omp for
+		for (int j = low_bandwidth; j < id_first; j++){
+			
+			int curr_seed = random_seed*(j+seed_mult);
+			int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+			for (int k = 0; k < id_first; k++){
+				is_nz_ind [k] = 0;
+			}
+			
+			is_nz_ind [j] = 1; // make diagonal 1
+			
+			unsigned int mystate = curr_seed + curr_degree%10;
+			
+			int jl = j-low_bandwidth;
+			int ijl = id_first-jl;
+			
+			//randomly fill nonzero values
+			for (int k = 0; k < curr_degree-1; k++){
+				is_nz_ind [rand_r(&mystate) % ijl + jl ] = 1;
+			}
+			
+			indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			
+			curr_degree = 0;
+			for (int k = 0; k < id_first; k++) {
+				if (is_nz_ind [k]){
+					indices[j][curr_degree++] = k ;
+				}
+			}
+			degrees[j] = curr_degree;
+		}
+		free(is_nz_ind);
+	}
+}
+
+
+void distribute_square_nonsym_case2 ( double avg, double std, int min, int max, int id_first, 
+							int random_seed, int seed_mult, int low_bandwidth, int up_bandwidth, int *degrees, int **indices) 
+{
+	int ul = up_bandwidth + low_bandwidth;
+	int ru = id_first - up_bandwidth;
+	double vals_pos = avg - 3 * std; // to determine whether most values are expected to be positive with normal distribution
+				
+	#pragma omp parallel
+	{
+		USHI *is_nz_ind = (USHI*) safe_malloc(id_first * sizeof(USHI));
+		#pragma omp for
+		for (int j = 0; j < low_bandwidth; j++){
+			int curr_seed = random_seed*(j+seed_mult);
+			
+			int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+			for (int k = 0; k < id_first; k++){
+				is_nz_ind [k] = 0;
+			}
+			
+			is_nz_ind [j] = 1; // make diagonal 1
+			
+			unsigned int mystate = curr_seed + curr_degree%10;
+			
+			int ju = j+up_bandwidth;
+			
+			//randomly fill nonzero values
+			for (int k = 0; k < curr_degree-1; k++){
+				is_nz_ind [rand_r(&mystate) % ju] = 1;
+			}
+			
+			indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			
+			curr_degree = 0;
+			for (int k = 0; k < id_first; k++) {
+				if (is_nz_ind [k]){
+					indices[j][curr_degree++] = k ;
+				}
+			}
+			degrees[j] = curr_degree;
+		}
+		
+		
+		#pragma omp for
+		for (int j = low_bandwidth; j < ru; j++){
+			int curr_seed = random_seed*(j+seed_mult);
+			
+			int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+			for (int k = 0; k < id_first; k++){
+				is_nz_ind [k] = 0;
+			}
+			
+			is_nz_ind [j] = 1; // make diagonal 1
+			
+			unsigned int mystate = curr_seed + curr_degree%10;
+			
+			int jl = j-low_bandwidth;
+			
+			//randomly fill nonzero values
+			for (int k = 0; k < curr_degree-1; k++){
+				is_nz_ind [rand_r(&mystate) % ul + jl] = 1;
+			}
+			
+			indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			
+			curr_degree = 0;
+			for (int k = 0; k < id_first; k++) {
+				if (is_nz_ind [k]){
+					indices[j][curr_degree++] = k ;
+				}
+			}
+			degrees[j] = curr_degree;
+		}
+		
+		#pragma omp for
+		for (int j = ru; j < id_first; j++){
+			int curr_seed = random_seed*(j+seed_mult);
+			
+			int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+			for (int k = 0; k < id_first; k++){
+				is_nz_ind [k] = 0;
+			}
+			
+			is_nz_ind [j] = 1; // make diagonal 1
+			
+			unsigned int mystate = curr_seed + curr_degree%10;
+			
+			int jl = j-low_bandwidth;
+			int ijl = id_first-jl;
+			
+			//randomly fill nonzero values
+			for (int k = 0; k < curr_degree-1; k++){
+				is_nz_ind [rand_r(&mystate) % ijl + jl ] = 1;
+			}
+			
+			indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			
+			curr_degree = 0;
+			for (int k = 0; k < id_first; k++) {
+				if (is_nz_ind [k]){
+					indices[j][curr_degree++] = k ;
+				}
+			}
+			degrees[j] = curr_degree;
+		}
+		free(is_nz_ind);
+	}
+	
+}
+
+
+void distribute_rectangular ( double avg, double std, int min, int max, int id_first, int id_second, 
+							int random_seed, int seed_mult, int *degrees, int **indices) 
+{	
+	double vals_pos = avg - 3 * std; // to determine whether most values are expected to be positive with normal distribution
+	
+	#pragma omp parallel
+	{
+		USHI *is_nz_ind = (USHI*) safe_malloc(id_second * sizeof(USHI));
+		#pragma omp for
+		for (int j = 0; j < id_first; j++){
+			
+			int curr_seed = random_seed*(j+seed_mult);
+			
+			int curr_degree = rand_count(avg, std, min, max, curr_seed, vals_pos);
+
+			for (int k = 0; k < id_second; k++){
+				is_nz_ind [k] = 0;
+			}
+			
+			unsigned int mystate = curr_seed + curr_degree%10;
+			
+			//randomly fill nonzero values
+			for (int k = 0; k < curr_degree; k++){
+				is_nz_ind [rand_r(&mystate) % id_second] = 1;
+			}
+			
+			indices[j] = (int *)safe_calloc( curr_degree , sizeof(int));
+			
+			curr_degree = 0;
+			for (int k = 0; k < id_second; k++) {
+				if (is_nz_ind [k]){
+					indices[j][curr_degree] = k ;
+					curr_degree++;
+				}
+			}
+			degrees[j] = curr_degree;	
+		}	
+		free(is_nz_ind);
+	}			
+}
+
+
+
 
 //===========================================================================
 //=  Function to generate normally distributed random variable using the    =
@@ -971,8 +1013,8 @@ void printusage()
 	printf("\t-m min :\t min degree value \n");
 	printf("\t-i imbalance :\t (max-avg) / avg\n");
 	printf("\t-v cv :\t coefficient of variation for row (column) degrees    \n");
-	printf("\t-u up_bandwidth : upper matrix bandwidth (valid if matrix is square)\n");
 	printf("\t-l low_bandwidth : lower matrix bandwidth (valid if matrix is square)\n");
+	printf("\t-u up_bandwidth : upper matrix bandwidth (only for non-symmetric square matrices)\n");
 	printf("\t-r random_seed :\t seed for randomness \n");
 	printf("\t-o outfile :\t to print out the generated matrix \n");
 	printf("\t-h print_header :\t to print the header names for the output values \n");
