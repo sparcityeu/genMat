@@ -28,7 +28,7 @@ USAGE:
 
 Some example run commands will be like the following:
 ```
-./genmat 1000 2000 -d 0.02 -v 0.5 -i 1.5 -o sample_directory/generated_1000_2000.mtx
-./genmat 1000 1000 -d 0.02 -v 0.5 -i 1.5 -l 200 -u 400 -o sample_directory/generated_1000_square.mtx
-./genmat 1000 1000 -d 0.02 -v 0.5 -i 1.5 -s 1 -l 200 -o sample_directory/generated_1000_sym.mtx
+./genmat 1000 2000 -d 0.02 -v 0.5 -i 1.5 -o ../sample_data/generated_1000_2000.mtx
+./genmat 1000 1000 -d 0.02 -v 0.5 -i 1.5 -l 200 -u 400 -o ../sample_data/generated_1000_square.mtx
+./genmat 1000 1000 -d 0.02 -v 0.5 -i 1.5 -s 1 -l 200 -o ../sample_data/generated_1000_sym.mtx
 ``` 
