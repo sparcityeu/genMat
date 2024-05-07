@@ -1,4 +1,4 @@
-# Matrix-Generator
+# GenMat: A Sparse Matrix Generator
 The **genMat** program generates sparse matrices with several given features.
 It adopts a combination of normal distribution and log-normal distribution.
 
